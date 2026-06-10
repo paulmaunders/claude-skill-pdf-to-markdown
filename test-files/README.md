@@ -23,6 +23,12 @@ A large test document for performance benchmarking that includes:
 - Lists and formatted text
 - Realistic document structure for testing performance
 
+### scanned-document.pdf (1 page, image-only)
+A "scanned" document with **no text layer** — the page is a raster image, so
+standard extraction returns nothing and only OCR can recover the text. Used by
+the OCR extraction tests (which skip automatically when Tesseract/OpenCV are
+unavailable).
+
 ## Generating Test Documents
 
 The test PDFs are generated programmatically using included scripts:
@@ -33,6 +39,9 @@ uv run --with reportlab -- python test-files/generate_sample_pdf.py
 
 # Generate 35-page large document
 uv run --with reportlab -- python test-files/generate_large_pdf.py
+
+# Generate image-only scanned document (for OCR tests)
+uv run --with pymupdf==1.27.2.3 -- python test-files/generate_scanned_pdf.py
 ```
 
 This creates fresh PDFs with consistent, reproducible content.
@@ -43,7 +52,7 @@ Test the conversion with:
 
 ```bash
 # Convert to markdown
-uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdown_pymupdf.py test-files/sample-document.pdf
+uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py test-files/sample-document.pdf
 
 # Output will be saved as test-files/sample-document.md
 ```
@@ -53,7 +62,7 @@ uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdow
 Benchmark conversion performance:
 
 ```bash
-uv run --with pymupdf4llm -- python test-files/benchmark.py test-files/large-document.pdf
+uv run --with pymupdf4llm==1.27.2.3 -- python test-files/benchmark.py test-files/large-document.pdf
 ```
 
 ## What to Look For

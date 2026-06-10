@@ -7,26 +7,26 @@ lists, bold/italic text, and code blocks in GitHub-compatible Markdown.
 
 Usage:
   # Single file
-  uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdown_pymupdf.py input.pdf
+  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf
 
   # Single file with custom output
-  uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdown_pymupdf.py input.pdf -o output.md
+  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf -o output.md
 
   # Batch process directory
-  uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdown_pymupdf.py /path/to/pdfs/ -o pymupdf-md/
+  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py /path/to/pdfs/ -o pymupdf-md/
 
   # Page chunks (separate markdown per page)
-  uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdown_pymupdf.py input.pdf --page-chunks
+  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf --page-chunks
 
   # OCR for scanned/image-based PDFs (requires Tesseract)
-  uv run --with pymupdf4llm --with pymupdf-layout --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
+  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
 
   # OCR with specific language
-  uv run --with pymupdf4llm --with pymupdf-layout --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py document.pdf --ocr --ocr-language deu
+  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py document.pdf --ocr --ocr-language deu
 
 Examples:
-  uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdown_pymupdf.py "path/to/document.pdf"
-  uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdown_pymupdf.py /path/to/pdfs/ -o /path/to/output/
+  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py "path/to/document.pdf"
+  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py /path/to/pdfs/ -o /path/to/output/
 """
 import argparse
 import sys
@@ -46,7 +46,7 @@ try:
     import pymupdf4llm
 except ImportError:
     print("Error: pymupdf4llm package is required.")
-    print("Run with: uv run --with pymupdf4llm --with pymupdf-layout -- python ...")
+    print("Run with: uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python ...")
     print("Or install: pip install pymupdf4llm")
     sys.exit(1)
 
@@ -213,6 +213,23 @@ def merge_paragraph_lines(text: str) -> str:
     return '\n'.join(result)
 
 
+def strip_trailing_whitespace(text: str) -> str:
+    """Remove trailing whitespace from each line.
+
+    PyMuPDF4LLM emits a trailing space on most lines; trimming keeps the
+    markdown clean for diffing and LLM consumption.
+    """
+    return '\n'.join(line.rstrip() for line in text.split('\n'))
+
+
+def postprocess_markdown(text: str, merge_lines: bool) -> str:
+    """Clean table cells, optionally merge paragraph lines, and trim line ends."""
+    text = clean_tables_in_text(text)
+    if merge_lines:
+        text = merge_paragraph_lines(text)
+    return strip_trailing_whitespace(text)
+
+
 def convert_pdf_to_markdown(
     pdf_path: Path,
     output_path: Path = None,
@@ -241,11 +258,7 @@ def convert_pdf_to_markdown(
             if output_path is None:
                 output_base = pdf_path.with_suffix('')
                 for i, page_data in enumerate(md_data, start=1):
-                    page_text = page_data['text']
-                    # Always clean tables, optionally merge paragraphs
-                    page_text = clean_tables_in_text(page_text)
-                    if merge_lines:
-                        page_text = merge_paragraph_lines(page_text)
+                    page_text = postprocess_markdown(page_data['text'], merge_lines)
                     page_output = output_base.parent / f"{output_base.name}_page_{i}.md"
                     page_output.write_text(page_text, encoding='utf-8')
                 print(f"✓ Created {len(md_data)} page files")
@@ -256,17 +269,13 @@ def convert_pdf_to_markdown(
                     output_path.mkdir(parents=True, exist_ok=True)
                     output_base = output_path / pdf_path.stem
                     for i, page_data in enumerate(md_data, start=1):
-                        page_text = page_data['text']
-                        # Always clean tables, optionally merge paragraphs
-                        page_text = clean_tables_in_text(page_text)
-                        if merge_lines:
-                            page_text = merge_paragraph_lines(page_text)
+                        page_text = postprocess_markdown(page_data['text'], merge_lines)
                         page_output = output_path / f"{pdf_path.stem}_page_{i}.md"
                         page_output.write_text(page_text, encoding='utf-8')
                     print(f"✓ Created {len(md_data)} page files in {output_path}")
                     return True
                 else:
-                    print(f"✗ Error: page_chunks requires output to be a directory")
+                    print("✗ Error: page_chunks requires output to be a directory")
                     return False
         else:
             # Single markdown file
@@ -277,10 +286,8 @@ def convert_pdf_to_markdown(
                 ocr_dpi=ocr_dpi
             )
 
-            # Always clean tables, optionally merge paragraphs
-            md_text = clean_tables_in_text(md_text)
-            if merge_lines:
-                md_text = merge_paragraph_lines(md_text)
+            # Always clean tables, optionally merge paragraphs, trim line ends
+            md_text = postprocess_markdown(md_text, merge_lines)
 
             # Determine output path
             if output_path is None:
@@ -362,7 +369,7 @@ def main():
         except ImportError:
             print("Error: OCR requires opencv-python package.")
             print("Add --with opencv-python to your uv run command:")
-            print("  uv run --with pymupdf4llm --with pymupdf-layout --with opencv-python -- python ...")
+            print("  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python ...")
             sys.exit(1)
         tesseract_ok, tesseract_msg = check_tesseract_available()
         if not tesseract_ok:
