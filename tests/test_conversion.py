@@ -3,7 +3,7 @@
 Integration tests for PDF to Markdown conversion.
 
 Run with:
-    uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with pytest -- pytest tests/
+    uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 --with pytest -- pytest tests/
 """
 
 import shutil
@@ -64,6 +64,26 @@ class TestSampleDocumentConversion:
 
         # Check for markdown headers
         assert "## " in content or "# " in content, "No headers found in output"
+
+    def test_header_hierarchy_preserved(self, tmp_path):
+        """Multi-level headers must keep their levels (H1/H2/H3), not flatten to ##.
+
+        Guards against the ML layout engine taking over the non-OCR path:
+        pymupdf4llm 1.27.x+ flattens every heading to '##'.
+        """
+        pdf_path = TEST_FILES / "sample-document.pdf"
+        output_path = tmp_path / "output.md"
+
+        run_conversion(pdf_path, ["-o", str(output_path)])
+        lines = output_path.read_text().split("\n")
+
+        h1 = [l for l in lines if l.startswith("# ")]
+        h2 = [l for l in lines if l.startswith("## ")]
+        h3 = [l for l in lines if l.startswith("### ")]
+
+        assert h1, "No H1 headers found - hierarchy may have been flattened"
+        assert h2, "No H2 headers found"
+        assert h3, "No H3 headers found - hierarchy may have been flattened"
 
     def test_output_contains_tables(self, tmp_path):
         """Test that tables are preserved in output."""

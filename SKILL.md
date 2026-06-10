@@ -10,7 +10,7 @@ description: Convert PDF documents to markdown format optimised for LLM consumpt
 For most PDFs, use PyMuPDF4LLM (instant extraction):
 
 ```bash
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf
 ```
 
 Output will be saved as `input.md` in the same directory.
@@ -22,13 +22,13 @@ Output will be saved as `input.md` in the same directory.
 This skill uses `uv` to manage dependencies automatically.
 
 **Dependencies** (installed on-demand via `uv run --with`):
-- `pymupdf4llm==1.27.2.3` - Fast PDF extraction (required)
-- `pymupdf-layout==1.27.2.3` - Page layout analysis and OCR support (required for the documented commands)
+- `pymupdf4llm==0.3.4` - Fast PDF extraction (required)
+- `pymupdf-layout==1.27.2.3` - OCR-capable layout engine, used only with `--ocr` (required for the documented commands)
 - `opencv-python` - Required for OCR support (optional)
 
 No pre-installation needed - `uv run --with` installs packages temporarily when scripts execute.
 
-**Note**: Versions are pinned (`==1.27.2.3`) so output stays reproducible. PyMuPDF4LLM's markdown formatting (header levels, list rendering) changes between releases, so unpinned runs may produce different structure than the examples here.
+**Note**: Versions are pinned so output stays reproducible. The script uses two extraction engines: the legacy engine (default) preserves multi-level header hierarchy (`#`/`##`/`###`); the ML layout engine (used only with `--ocr`) can read scanned pages but flattens all headers to `##`. Newer pymupdf4llm releases (1.27.x+) force the layout engine unconditionally, which is why `pymupdf4llm` is pinned to 0.3.4.
 
 ## Features
 
@@ -43,27 +43,27 @@ No pre-installation needed - `uv run --with` installs packages temporarily when 
 
 ### Single file
 ```bash
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py document.pdf
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py document.pdf
 ```
 
 ### Single file with custom output
 ```bash
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf -o output.md
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf -o output.md
 ```
 
 ### Batch process directory
 ```bash
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py pdfs/ -o markdown/
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py pdfs/ -o markdown/
 ```
 
 ### Keep original line breaks (disable merging)
 ```bash
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf --no-merge
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf --no-merge
 ```
 
 ### Page chunks (separate markdown per page)
 ```bash
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf --page-chunks
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf --page-chunks
 ```
 
 ## OCR Support (Scanned PDFs)
@@ -72,16 +72,16 @@ For scanned documents or image-heavy PDFs where standard text extraction fails, 
 
 ### Basic OCR
 ```bash
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
 ```
 
 ### With Language Support
 ```bash
 # German documents
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py document.pdf --ocr --ocr-language deu
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py document.pdf --ocr --ocr-language deu
 
 # Multi-language (English + German)
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py document.pdf --ocr --ocr-language eng+deu
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py document.pdf --ocr --ocr-language eng+deu
 ```
 
 ### OCR Options
@@ -108,6 +108,8 @@ When `--ocr` is enabled, pymupdf-layout automatically:
 3. Text-based pages are processed normally (faster)
 
 This means you can safely use `--ocr` on mixed documents - it won't slow down pages that don't need it.
+
+**Caveat**: the OCR layout engine flattens all headers to `##` (it detects *that* a line is a heading, not its level). Multi-level header hierarchy is only preserved in the default (non-OCR) mode, so use `--ocr` only when a document actually needs it.
 
 ## How It Works
 
@@ -137,21 +139,21 @@ When a user mentions PDFs or needs to extract text from documents, use this skil
 
 ```bash
 # User: "Extract text from this PDF document"
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py document.pdf
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py document.pdf
 
 # User: "Convert all PDFs in this folder to markdown"
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py pdfs/ -o markdown/
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py pdfs/ -o markdown/
 
 # User: "I need to analyze this PDF document"
 # First convert to markdown, then analyze
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py document.pdf
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py document.pdf
 
 # User: "This PDF looks like a scan, the text extraction isn't working well"
 # Use OCR for scanned documents
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
 
 # Test with the included sample:
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py test-files/sample-document.pdf
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py test-files/sample-document.pdf
 ```
 
 ## Tips
