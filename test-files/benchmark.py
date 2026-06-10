@@ -3,7 +3,7 @@
 Benchmark PyMuPDF4LLM PDF conversion performance.
 
 Usage:
-    uv run --with pymupdf4llm -- python test-files/benchmark.py test-files/large-document.pdf
+    uv run --with pymupdf4llm==1.27.2.3 -- python test-files/benchmark.py test-files/large-document.pdf
 """
 
 import sys

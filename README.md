@@ -43,12 +43,12 @@ Once installed, Claude Code will automatically use this skill when you mention P
 
 #### Convert single PDF
 ```bash
-uv run --with pymupdf4llm --with pymupdf-layout -- python ~/.claude/skills/pdf-to-markdown/scripts/pdf_to_markdown_pymupdf.py document.pdf
+uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python ~/.claude/skills/pdf-to-markdown/scripts/pdf_to_markdown_pymupdf.py document.pdf
 ```
 
 #### Batch process directory
 ```bash
-uv run --with pymupdf4llm --with pymupdf-layout -- python ~/.claude/skills/pdf-to-markdown/scripts/pdf_to_markdown_pymupdf.py pdfs/ -o markdown/
+uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python ~/.claude/skills/pdf-to-markdown/scripts/pdf_to_markdown_pymupdf.py pdfs/ -o markdown/
 ```
 
 #### Options
@@ -63,7 +63,7 @@ uv run --with pymupdf4llm --with pymupdf-layout -- python ~/.claude/skills/pdf-t
 
 ```bash
 # Requires Tesseract: brew install tesseract (macOS)
-uv run --with pymupdf4llm --with pymupdf-layout --with opencv-python -- python ~/.claude/skills/pdf-to-markdown/scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
+uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python ~/.claude/skills/pdf-to-markdown/scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
 ```
 
 ## How It Works
@@ -141,7 +141,7 @@ claude-skill-pdf-to-markdown/
 Run the integration test suite with:
 
 ```bash
-uv run --with pymupdf4llm --with pymupdf-layout --with pytest -- pytest tests/ -v
+uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with pytest -- pytest tests/ -v
 ```
 
 ### Testing Changes Manually
@@ -149,7 +149,7 @@ uv run --with pymupdf4llm --with pymupdf-layout --with pytest -- pytest tests/ -
 After modifying scripts, test with:
 
 ```bash
-uv run --with pymupdf4llm --with pymupdf-layout -- python scripts/pdf_to_markdown_pymupdf.py test.pdf
+uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py test.pdf
 ```
 
 ### Contributing
@@ -165,9 +165,9 @@ The symlink ensures changes are immediately available in Claude Code.
 
 - Python 3.8+
 - uv (for dependency management)
-- Libraries installed on-demand via `uv run --with`:
-  - pymupdf4llm
-  - pymupdf-layout (improved page layout analysis)
+- Libraries installed on-demand via `uv run --with` (pinned for reproducible output):
+  - pymupdf4llm==1.27.2.3
+  - pymupdf-layout==1.27.2.3 (page layout analysis; required by the documented commands and for OCR)
   - opencv-python (for OCR support)
 - **For OCR**: Tesseract OCR engine
   - macOS: `brew install tesseract`

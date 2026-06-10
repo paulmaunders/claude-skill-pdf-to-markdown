@@ -3,17 +3,31 @@
 Integration tests for PDF to Markdown conversion.
 
 Run with:
-    uv run --with pymupdf4llm --with pymupdf-layout --with pytest -- pytest tests/
+    uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with pytest -- pytest tests/
 """
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 # Get the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "pdf_to_markdown_pymupdf.py"
 TEST_FILES = PROJECT_ROOT / "test-files"
+
+
+def ocr_available() -> bool:
+    """True only when both OpenCV and Tesseract are installed for real OCR runs."""
+    if shutil.which("tesseract") is None:
+        return False
+    try:
+        import cv2  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 def run_conversion(pdf_path: Path, extra_args: list = None) -> tuple[str, str, int]:
@@ -191,3 +205,48 @@ class TestOCRRequirements:
         else:
             # OCR succeeded, output should exist
             assert output_path.exists(), "Output file should exist when OCR succeeds"
+
+
+class TestOCRExtraction:
+    """End-to-end OCR on an image-only PDF (skipped if OCR deps are missing)."""
+
+    def test_scanned_pdf_has_no_text_layer(self, tmp_path):
+        """Without OCR, the scanned fixture yields effectively no text."""
+        pdf_path = TEST_FILES / "scanned-document.pdf"
+        output_path = tmp_path / "no_ocr.md"
+
+        run_conversion(pdf_path, ["-o", str(output_path)])
+
+        # Image-only PDF: standard extraction should produce little/no text
+        assert "Invoice Number" not in output_path.read_text()
+
+    @pytest.mark.skipif(not ocr_available(), reason="Requires Tesseract and OpenCV")
+    def test_ocr_recovers_text_from_scan(self, tmp_path):
+        """With OCR, the embedded text is recovered from the image-only PDF."""
+        pdf_path = TEST_FILES / "scanned-document.pdf"
+        output_path = tmp_path / "ocr.md"
+
+        stdout, stderr, returncode = run_conversion(
+            pdf_path, ["-o", str(output_path), "--ocr"]
+        )
+
+        assert returncode == 0, f"OCR conversion failed: {stdout}{stderr}"
+        content = output_path.read_text()
+        assert "Scanned Document Test" in content, f"OCR missed the title: {content!r}"
+        assert "Invoice Number: 12345" in content, f"OCR missed the body: {content!r}"
+
+
+class TestOutputCleanliness:
+    """Guard against formatting regressions in the post-processing."""
+
+    def test_no_trailing_whitespace(self, tmp_path):
+        """Output lines should be trimmed (PyMuPDF4LLM emits trailing spaces)."""
+        pdf_path = TEST_FILES / "sample-document.pdf"
+        output_path = tmp_path / "output.md"
+
+        run_conversion(pdf_path, ["-o", str(output_path)])
+
+        lines_with_trailing = [
+            line for line in output_path.read_text().split("\n") if line != line.rstrip()
+        ]
+        assert not lines_with_trailing, f"Found trailing whitespace on lines: {lines_with_trailing!r}"
