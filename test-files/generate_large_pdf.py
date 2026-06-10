@@ -206,7 +206,7 @@ def create_large_pdf():
     print(f"  File size: {output_path.stat().st_size / 1024:.1f} KB")
     print(f"  Pages: 35")
     print(f"\nTest with:")
-    print(f"  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py {output_path}")
+    print(f"  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py {output_path}")
 
 
 if __name__ == "__main__":

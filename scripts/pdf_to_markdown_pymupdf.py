@@ -7,26 +7,26 @@ lists, bold/italic text, and code blocks in GitHub-compatible Markdown.
 
 Usage:
   # Single file
-  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf
+  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf
 
   # Single file with custom output
-  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf -o output.md
+  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf -o output.md
 
   # Batch process directory
-  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py /path/to/pdfs/ -o pymupdf-md/
+  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py /path/to/pdfs/ -o pymupdf-md/
 
   # Page chunks (separate markdown per page)
-  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf --page-chunks
+  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py input.pdf --page-chunks
 
   # OCR for scanned/image-based PDFs (requires Tesseract)
-  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
+  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py scanned.pdf --ocr
 
   # OCR with specific language
-  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py document.pdf --ocr --ocr-language deu
+  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python scripts/pdf_to_markdown_pymupdf.py document.pdf --ocr --ocr-language deu
 
 Examples:
-  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py "path/to/document.pdf"
-  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py /path/to/pdfs/ -o /path/to/output/
+  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py "path/to/document.pdf"
+  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py /path/to/pdfs/ -o /path/to/output/
 """
 import argparse
 import sys
@@ -35,20 +35,40 @@ import re
 import shutil
 import subprocess
 
-# IMPORTANT: Import pymupdf.layout BEFORE pymupdf4llm to enable layout mode and OCR support
-try:
-    import pymupdf.layout  # noqa: F401 - enables layout mode
-    LAYOUT_MODE = True
-except ImportError:
-    LAYOUT_MODE = False
+# Both imports are deferred until main() has parsed arguments. pymupdf4llm
+# picks its extraction engine at import time: if pymupdf.layout is already
+# loaded it uses the ML layout engine (OCR-capable, but flattens all headers
+# to '##'), otherwise the legacy engine (multi-level headers, no OCR). We only
+# accept the flat-header trade-off when --ocr is requested.
+LAYOUT_MODE = False
+pymupdf4llm = None
 
-try:
-    import pymupdf4llm
-except ImportError:
-    print("Error: pymupdf4llm package is required.")
-    print("Run with: uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python ...")
-    print("Or install: pip install pymupdf4llm")
-    sys.exit(1)
+
+def enable_layout_mode() -> bool:
+    """Import pymupdf.layout to enable the OCR-capable layout engine.
+
+    Must be called before import_pymupdf4llm() for the engine switch to take
+    effect.
+    """
+    global LAYOUT_MODE
+    try:
+        import pymupdf.layout  # noqa: F401 - switches pymupdf4llm to layout engine
+        LAYOUT_MODE = True
+    except ImportError:
+        LAYOUT_MODE = False
+    return LAYOUT_MODE
+
+
+def import_pymupdf4llm():
+    """Import pymupdf4llm after the engine decision has been made."""
+    global pymupdf4llm
+    try:
+        import pymupdf4llm
+    except ImportError:
+        print("Error: pymupdf4llm package is required.")
+        print("Run with: uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python ...")
+        print("Or install: pip install pymupdf4llm")
+        sys.exit(1)
 
 
 def check_tesseract_available() -> tuple:
@@ -244,14 +264,19 @@ def convert_pdf_to_markdown(
         ocr_indicator = " [OCR]" if use_ocr else ""
         print(f"Converting {pdf_path.name}{ocr_indicator}...", end=" ")
 
+        # The legacy engine warns about (and ignores) OCR kwargs, so only pass
+        # them when OCR is active and the layout engine is in use.
+        ocr_kwargs = (
+            dict(use_ocr=True, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
+            if use_ocr else {}
+        )
+
         if page_chunks:
             # Get list of dicts, one per page
             md_data = pymupdf4llm.to_markdown(
                 str(pdf_path),
                 page_chunks=True,
-                use_ocr=use_ocr,
-                ocr_language=ocr_language,
-                ocr_dpi=ocr_dpi
+                **ocr_kwargs
             )
 
             # Default output: replace .pdf with _page_N.md
@@ -281,9 +306,7 @@ def convert_pdf_to_markdown(
             # Single markdown file
             md_text = pymupdf4llm.to_markdown(
                 str(pdf_path),
-                use_ocr=use_ocr,
-                ocr_language=ocr_language,
-                ocr_dpi=ocr_dpi
+                **ocr_kwargs
             )
 
             # Always clean tables, optionally merge paragraphs, trim line ends
@@ -359,7 +382,7 @@ def main():
 
     # Check Tesseract and OpenCV if OCR is requested
     if args.ocr:
-        if not LAYOUT_MODE:
+        if not enable_layout_mode():
             print("Error: OCR requires pymupdf-layout package.")
             print("Install with: pip install pymupdf-layout")
             sys.exit(1)
@@ -369,7 +392,7 @@ def main():
         except ImportError:
             print("Error: OCR requires opencv-python package.")
             print("Add --with opencv-python to your uv run command:")
-            print("  uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python ...")
+            print("  uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 --with opencv-python -- python ...")
             sys.exit(1)
         tesseract_ok, tesseract_msg = check_tesseract_available()
         if not tesseract_ok:
@@ -378,6 +401,8 @@ def main():
         print(f"OCR enabled ({tesseract_msg})")
         print(f"  Language: {args.ocr_language}, DPI: {args.ocr_dpi}")
         print()
+
+    import_pymupdf4llm()
 
     merge_lines = not args.no_merge
 

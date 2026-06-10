@@ -4,7 +4,7 @@ This directory contains test files for the PDF to Markdown skill.
 
 ## Test Documents
 
-### sample-document.pdf (2 pages)
+### sample-document.pdf (3 pages)
 A comprehensive test document that includes:
 - Multi-level headers (H1, H2)
 - Paragraphs with line breaks (to test merging)
@@ -52,7 +52,7 @@ Test the conversion with:
 
 ```bash
 # Convert to markdown
-uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py test-files/sample-document.pdf
+uv run --with pymupdf4llm==0.3.4 --with pymupdf-layout==1.27.2.3 -- python scripts/pdf_to_markdown_pymupdf.py test-files/sample-document.pdf
 
 # Output will be saved as test-files/sample-document.md
 ```
@@ -62,7 +62,7 @@ uv run --with pymupdf4llm==1.27.2.3 --with pymupdf-layout==1.27.2.3 -- python sc
 Benchmark conversion performance:
 
 ```bash
-uv run --with pymupdf4llm==1.27.2.3 -- python test-files/benchmark.py test-files/large-document.pdf
+uv run --with pymupdf4llm==0.3.4 -- python test-files/benchmark.py test-files/large-document.pdf
 ```
 
 ## What to Look For
